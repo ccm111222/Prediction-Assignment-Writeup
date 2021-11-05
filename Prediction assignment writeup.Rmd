@@ -1,0 +1,99 @@
+Peer-graded Assignment: Prediction project
+==========================================
+
+# Summary
+This report uses data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to generate machine learning models to predict how well people perform a particular activity.
+
+I tried to fit 3 different machine learning models, including the classification tree, random forest, and boosting model, and I found that the random forest model performed the best, with accuracy of 0.9988, followed by the boosting model (accuracy=0.9967). I then used the random forest model to predict the classe of the test data set.
+
+# Loading packages
+I firstly loaded the packages that would be used in the analyses.
+```{r,echo=TRUE, message=FALSE, results=FALSE, warning=FALSE}
+library(rattle)
+library(caret)
+```
+
+# Download the data files
+1. I downloaded the data from the website and then load the data into r using read.csv.
+2. I convert the main outcome "classe" into factor variable.
+3. I checked the dimension of the training set and there are 160 different variables.
+```{r, echo=TRUE}
+if (!file.exists("pml-training.csv")){
+    url1<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+    download.file(url1, destfile ="./pml-training.csv", method = "curl")
+}
+
+if (!file.exists("pml-testing.csv")){
+    url2<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+    download.file(url2, destfile ="./pml-testing.csv", method = "curl")
+}
+
+training <- read.csv("pml-training.csv",na.strings=c("","NA"))
+testing <- read.csv("pml-testing.csv",na.strings=c("","NA"))
+
+training$classe<-as.factor(training$classe)
+dim(training)
+```
+
+# Filter the column variables by removing NAs and near zero variables
+Here, I removed the NA variables, the ID variables, or the near zero variables. The total number of variables decreased from 160 to 58.
+```{r, echo=TRUE}
+# Remove columns that contain NAs
+training <- training[,colSums(is.na(training))==0]
+
+# Remove the columns of user ID
+training<-training[,-1]
+
+# Remove near zero variables from both the training and test datasets
+training<-training[,!(nearZeroVar(training,saveMetrics = TRUE)$nzv)]
+dim(training)
+```
+
+# Split the training data set to sub-training and sub-testing data sets
+```{r, echo=TRUE}
+inTrain <- createDataPartition(training$classe,p=0.75,list=FALSE)
+subtraining <- training[inTrain,]
+subtesting <- training[-inTrain,]
+```
+
+# Fit a classification tree
+1. I performed 5-fold cross-validation for all of the machine learning models.
+2. By fitting classification free model using the sub-training set, I predict the classe using the sub-testing set, yielding an accuracy of 0.3638, which is not ideal.
+```{r, echo=TRUE,cache=TRUE}
+# For performing 5-fold cross validation
+myControl <- trainControl(method = "cv", number = 5)
+
+# Fit a classification tree
+modelFit1 <- train(classe~., data=subtraining, method="rpart", trControl=myControl)
+fancyRpartPlot(modelFit1$finalModel)
+predict1<-predict(modelFit1, subtesting)
+confusionMatrix(predict1, subtesting$classe)
+```
+
+# Fit a random forest model
+By fitting random forest model using the sub-training set, I predict the classe using the sub-testing set, yielding an accuracy of 0.9988, which is the best prediction so far.
+```{r, echo=TRUE, cache=TRUE}
+modelFit2 <- train(classe~., data=subtraining, method="rf",trControl=myControl)
+predict2<-predict(modelFit2, subtesting)
+confusionMatrix(predict2, subtesting$classe)
+```
+
+# Fit a boosting model
+1. By fitting boosting model using the sub-training set, I predict the classe using the sub-testing set, yielding an accuracy of 0.9967, which is a little lower than that of the random forest model.
+2. Overall, the random forest model is the best model to predict the sub-testing data.
+```{r, echo=TRUE,cache=TRUE}
+modelFit3 <- train(classe~., data=subtraining, method="gbm",verbose=FALSE,trControl=myControl)
+predict3<-predict(modelFit3, subtesting)
+confusionMatrix(predict3, subtesting$classe)
+```
+
+# Prediction of the test set using the random forest model
+```{r, echo=TRUE}
+predict(modelFit2, testing)
+```
+
+
+
+
+
+
